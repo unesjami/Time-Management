@@ -4,7 +4,7 @@
   <link rel="shortcut icon" href="https://i.ibb.co/wZCzhSfW/2task-manager-favicon.png" type="image/png">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TaskFlow - 3-Way Planner</title>
+  <title>Task Manager · 3‑Way Planner</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
@@ -22,93 +22,70 @@
     body {
       font-family: 'Poppins', sans-serif;
       background: linear-gradient(135deg, #f5f5f5 0%, #ffffff 100%);
-      color: #1a1a1a;
-      transition: all 0.3s ease;
+      color: #1e1e1e;
+      transition: background 0.3s ease, color 0.2s ease;
     }
 
     body.dark-mode {
-      background: linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 100%);
-      color: #f5f5f5;
+      background: linear-gradient(135deg, #121212 0%, #1a1c1e 100%);
+      color: #e0e0e0;
     }
 
     .card {
       background-color: #ffffff;
-      transition: all 0.3s ease;
-      border: 1px solid #e5e5e5;
+      transition: background 0.3s ease, border 0.2s ease;
+      border: 1px solid #e2e2e2;
     }
 
     body.dark-mode .card {
-      background-color: #1f1f1f;
-      border: 1px solid #333333;
+      background-color: #1f2327;
+      border: 1px solid #3a3f44;
     }
 
     .shadow-soft {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
     }
-
     body.dark-mode .shadow-soft {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     }
 
-    .checkbox {
+    /* checkbox style – tick when done */
+    .task-checkbox {
       appearance: none;
-      width: 20px;
-      height: 20px;
-      border: 2px solid #cccccc;
-      border-radius: 4px;
+      width: 22px;
+      height: 22px;
+      border: 2px solid #aaaaaa;
+      border-radius: 5px;
       cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    body.dark-mode .checkbox {
-      border-color: #555555;
-    }
-
-    .checkbox:checked {
-      background-color: #333333;
-      border-color: #333333;
-    }
-
-    body.dark-mode .checkbox:checked {
-      background-color: #bbbbbb;
-      border-color: #bbbbbb;
-    }
-
-    .checkbox:checked::after {
-      content: '✓';
-      display: flex;
+      transition: all 0.15s;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
+      background-color: transparent;
+      font-size: 16px;
+      font-weight: 500;
+    }
+    body.dark-mode .task-checkbox {
+      border-color: #7f8c8d;
+    }
+    .task-checkbox:checked {
+      background-color: #2c3e50;
+      border-color: #2c3e50;
       color: white;
-      font-weight: bold;
-      font-size: 12px;
+    }
+    .task-checkbox:checked::after {
+      content: "✓";
+      line-height: 1;
+    }
+    body.dark-mode .task-checkbox:checked {
+      background-color: #6b8c9e;
+      border-color: #8aa9b9;
+    }
+    body.dark-mode .task-checkbox:checked::after {
+      color: #121212;
     }
 
-    body.dark-mode .checkbox:checked::after {
-      color: #1f1f1f;
-    }
-
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .task-item {
-      animation: slideIn 0.3s ease-out;
-    }
-
-    .column-header {
-      position: relative;
-      padding-bottom: 12px;
-      margin-bottom: 16px;
-    }
-
+    /* column header underline */
     .column-header::before {
       content: '';
       position: absolute;
@@ -116,319 +93,394 @@
       left: 0;
       right: 0;
       height: 3px;
-      background-color: #333333;
+      background-color: #2c3e50;
       border-radius: 2px;
     }
-
     body.dark-mode .column-header::before {
-      background-color: #888888;
+      background-color: #7f99b3;
+    }
+
+    /* delete icon appears only when task is done */
+    .delete-icon {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      font-size: 18px;
+      color: #b91c1c;
+      cursor: pointer;
+    }
+    body.dark-mode .delete-icon {
+      color: #f28b82;
+    }
+    .delete-icon.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .delete-icon:hover {
+      background: rgba(0,0,0,0.05);
+    }
+    body.dark-mode .delete-icon:hover {
+      background: rgba(255,255,255,0.1);
+    }
+
+    /* pen icon – minimal, replaces three dots */
+    .pen-icon {
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      font-size: 18px;
+      line-height: 1;
+      color: #4a4a4a;
+      cursor: pointer;
+      background: transparent;
+      border: none;
+      transition: background 0.1s;
+    }
+    body.dark-mode .pen-icon {
+      color: #c0c0c0;
+    }
+    .pen-icon:hover {
+      background: rgba(0,0,0,0.05);
+    }
+    body.dark-mode .pen-icon:hover {
+      background: rgba(255,255,255,0.1);
+    }
+
+    /* stat badge */
+    .stat-badge {
+      font-size: 0.7rem;
+      padding: 0.2rem 0.8rem;
+      border-radius: 30px;
+      background: #f0f0f0;
+      color: #333;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    body.dark-mode .stat-badge {
+      background: #2f3a44;
+      color: #d1dce6;
+    }
+
+    /* animation only for the target task when toggled */
+    @keyframes taskPop {
+      0% { transform: scale(1); background-color: transparent; }
+      30% { transform: scale(1.02); background-color: rgba(255, 215, 0, 0.15); }
+      100% { transform: scale(1); background-color: transparent; }
+    }
+    .task-highlight {
+      animation: taskPop 0.3s ease-out;
+    }
+
+    /* minimal edit menu (only edit) */
+    .edit-menu {
+      min-width: 70px;
+      background: white;
+      border: 1px solid #ddd;
+    }
+    body.dark-mode .edit-menu {
+      background: #2a3138;
+      border-color: #4a555f;
     }
   </style>
-  <style>body { box-sizing: border-box; }</style>
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js" type="text/javascript"></script>
-  <script src="https://cdn.tailwindcss.com/3.4.17" type="text/javascript"></script>
-  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
-  <script src="/_sdk/element_sdk.js" type="text/javascript"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
  </head>
  <body class="h-full flex flex-col">
   <div id="app" class="h-full flex flex-col overflow-hidden"></div>
   <script>
-    // Configuration
-    const COLUMNS = {
-      TODAY: 'today',
-      SOON: 'soon',
-      FUTURE: 'future'
-    };
+    (function() {
+      // ----- CONFIG (renamed columns) -----
+      const COLUMNS = {
+        TODAY: 'today',
+        SOON: 'soon',
+        FUTURE: 'future'
+      };
 
-    const COLUMN_INFO = {
-      today: { title: 'Today', color: '#333333', desc: 'Must have done today' },
-      soon: { title: 'This Week', color: '#555555', desc: 'Do in next 3 days' },
-      future: { title: 'Future', color: '#777777', desc: 'Later this month' }
-    };
+      const COLUMN_INFO = {
+        today: { title: 'Must have done Today', color: '#2c3e50', desc: '' },
+        soon: { title: 'I will do this soon', color: '#4f5b66', desc: '' },
+        future: { title: 'I will do in future', color: '#6f7c8a', desc: '' }
+      };
 
-    // Task Manager
-    class TaskManager {
-      constructor() {
-        this.tasks = this.loadTasks();
-        this.listeners = [];
-      }
+      // ----- TASK MANAGER (clean start) -----
+      class TaskManager {
+        constructor() {
+          this.tasks = this.loadTasks();
+          this.listeners = [];
+        }
 
-      loadTasks() {
-        const stored = localStorage.getItem('taskflow_tasks');
-        return stored ? JSON.parse(stored) : [];
-      }
+        loadTasks() {
+          const stored = localStorage.getItem('taskmanager_pen_v1');
+          return stored ? JSON.parse(stored) : [];
+        }
 
-      saveTasks() {
-        localStorage.setItem('taskflow_tasks', JSON.stringify(this.tasks));
-        this.notify();
-      }
+        saveTasks() {
+          localStorage.setItem('taskmanager_pen_v1', JSON.stringify(this.tasks));
+          this.notify();
+        }
 
-      addTask(title, column, description = '') {
-        const task = {
-          id: Date.now().toString(),
-          title,
-          description,
-          column,
-          completed: false,
-          createdAt: new Date().toISOString()
-        };
-        this.tasks.push(task);
-        this.saveTasks();
-      }
-
-      updateTask(id, updates) {
-        const task = this.tasks.find(t => t.id === id);
-        if (task) {
-          Object.assign(task, updates);
+        addTask(title, column, description = '') {
+          const task = {
+            id: Date.now().toString() + '-' + Math.random().toString(36).substring(2, 8),
+            title,
+            description,
+            column,
+            completed: false,
+            createdAt: new Date().toISOString()
+          };
+          this.tasks.push(task);
           this.saveTasks();
+        }
+
+        updateTask(id, updates) {
+          const task = this.tasks.find(t => t.id === id);
+          if (task) {
+            Object.assign(task, updates);
+            this.saveTasks();
+          }
+        }
+
+        deleteTask(id) {
+          this.tasks = this.tasks.filter(t => t.id !== id);
+          this.saveTasks();
+        }
+
+        getTasksByColumn(column) {
+          return this.tasks.filter(t => t.column === column).sort((a, b) => {
+            if (a.completed === b.completed) return new Date(b.createdAt) - new Date(a.createdAt);
+            return a.completed ? 1 : -1;
+          });
+        }
+
+        subscribe(listener) {
+          this.listeners.push(listener);
+        }
+
+        notify() {
+          this.listeners.forEach(l => l());
         }
       }
 
-      deleteTask(id) {
-        this.tasks = this.tasks.filter(t => t.id !== id);
-        this.saveTasks();
-      }
+      // ----- UI MANAGER (pen icon, no three dots) -----
+      class UIManager {
+        constructor(taskManager) {
+          this.taskManager = taskManager;
+          this.isDark = localStorage.getItem('taskmanager_dark') === 'true';
+          this.highlightedTaskId = null;
+          this.init();
+        }
 
-      getTasksByColumn(column) {
-        return this.tasks.filter(t => t.column === column).sort((a, b) => {
-          if (a.completed === b.completed) return new Date(b.createdAt) - new Date(a.createdAt);
-          return a.completed ? 1 : -1;
-        });
-      }
+        init() {
+          if (this.isDark) document.body.classList.add('dark-mode');
+          this.render();
+          this.taskManager.subscribe(() => this.render());
+        }
 
-      subscribe(listener) {
-        this.listeners.push(listener);
-      }
+        toggleDarkMode() {
+          this.isDark = !this.isDark;
+          document.body.classList.toggle('dark-mode');
+          localStorage.setItem('taskmanager_dark', this.isDark);
+          this.render();
+        }
 
-      notify() {
-        this.listeners.forEach(listener => listener());
-      }
-    }
+        setHighlight(id) {
+          this.highlightedTaskId = id;
+        }
 
-    // UI Manager
-    class UIManager {
-      constructor(taskManager) {
-        this.taskManager = taskManager;
-        this.isDark = localStorage.getItem('taskflow_dark') === 'true';
-        this.init();
-      }
+        render() {
+          const app = document.getElementById('app');
+          app.innerHTML = this.getAppHTML();
+        }
 
-      init() {
-        if (this.isDark) document.body.classList.add('dark-mode');
-        this.render();
-        this.taskManager.subscribe(() => this.render());
-      }
-
-      toggleDarkMode() {
-        this.isDark = !this.isDark;
-        document.body.classList.toggle('dark-mode');
-        localStorage.setItem('taskflow_dark', this.isDark);
-      }
-
-      render() {
-        const app = document.getElementById('app');
-        app.innerHTML = `
-          <header class="card shadow-soft p-6 border-b">
-            <div class="max-w-7xl mx-auto flex items-center justify-between">
-              <div>
-                <h1 class="text-3xl font-bold mb-1">TaskFlow</h1>
-                <p class="text-sm opacity-60">${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+        getAppHTML() {
+          const totalTasks = this.taskManager.tasks.length;
+          const doneTasks = this.taskManager.tasks.filter(t => t.completed).length;
+          return `
+            <header class="card shadow-soft px-4 py-2 border-b flex-shrink-0">
+              <div class="max-w-7xl mx-auto flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <h1 class="text-xl font-bold tracking-tight">Task Manager</h1>
+                  <div class="flex gap-1">
+                    <span class="stat-badge">📋 ${totalTasks}</span>
+                    <span class="stat-badge">✓ ${doneTasks}</span>
+                  </div>
+                </div>
+                <button onclick="ui.toggleDarkMode()" class="p-1.5 rounded-lg border text-sm w-9 h-9 ${this.isDark ? 'bg-gray-700 text-amber-300 border-gray-600' : 'bg-gray-200 text-gray-800 border-gray-300'}">
+                  ${this.isDark ? '☀️' : '🌙'}
+                </button>
               </div>
-              <button onclick="ui.toggleDarkMode()" class="p-2 rounded-lg transition-colors" style="background-color: ${this.isDark ? '#333333' : '#e5e5e5'}; color: ${this.isDark ? '#f5f5f5' : '#1a1a1a'};">
-                ${this.isDark ? '☀️' : '🌙'}
-              </button>
-            </div>
-          </header>
+            </header>
 
-          <main class="flex-1 overflow-y-auto p-6">
-            <div class="max-w-7xl mx-auto">
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                ${Object.values(COLUMNS).map(col => this.renderColumn(col)).join('')}
-              </div>
-              ${this.renderStats()}
-            </div>
-          </main>
-        `;
-      }
-
-      renderColumn(column) {
-        const tasks = this.taskManager.getTasksByColumn(column);
-        const info = COLUMN_INFO[column];
-        const completed = tasks.filter(t => t.completed).length;
-
-        return `
-          <div class="card shadow-soft rounded-xl p-6 flex flex-col">
-            <div class="column-header">
-              <h2 class="text-lg font-bold">${info.title}</h2>
-              <p class="text-xs opacity-60 mt-1">${info.desc}</p>
-            </div>
-
-            <div class="flex items-center gap-2 mb-4">
-              <span class="text-xs font-semibold px-3 py-1 rounded-full text-white" style="background-color: ${info.color};">${tasks.length}</span>
-              ${completed > 0 ? `<span class="text-xs opacity-60">${completed} done</span>` : ''}
-            </div>
-
-            <div class="flex-1 overflow-y-auto mb-4 space-y-3">
-              ${tasks.length === 0 ? `<div class="text-center py-8"><p class="text-sm opacity-50">No tasks yet</p></div>` : tasks.map(task => this.renderTask(task, column)).join('')}
-            </div>
-
-            <button onclick="ui.showAddForm('${column}')" class="w-full py-3 rounded-lg font-medium text-white transition-all hover:opacity-90" style="background-color: ${info.color};">+ Add Task</button>
-          </div>
-        `;
-      }
-
-      renderTask(task, column) {
-        const info = COLUMN_INFO[column];
-        return `
-          <div class="task-item p-4 rounded-lg" style="background-color: ${this.isDark ? '#2a2a2a' : '#f9f9f9'}; border: 1px solid ${this.isDark ? '#3a3a3a' : '#eeeeee'};">
-            <div class="flex gap-3">
-              <input type="checkbox" class="checkbox" ${task.completed ? 'checked' : ''} onchange="ui.toggleTask('${task.id}')">
-              <div class="flex-1 min-w-0">
-                <p class="font-medium ${task.completed ? 'line-through opacity-50' : ''}">${task.title}</p>
-                ${task.description ? `<p class="text-xs mt-1 opacity-60">${task.description}</p>` : ''}
-              </div>
-              <div class="relative">
-                <button onclick="ui.toggleMenu('${task.id}')" class="text-lg p-1 hover:opacity-60">⋮</button>
-                <div id="menu-${task.id}" class="hidden absolute right-0 top-8 z-10 card shadow-soft rounded-lg py-1 min-w-[140px]">
-                  <button onclick="ui.showEditForm('${task.id}')" class="w-full text-left text-xs px-3 py-2 hover:opacity-70">Edit</button>
-                  <button onclick="ui.deleteTask('${task.id}')" class="w-full text-left text-xs px-3 py-2 hover:opacity-70 text-red-600">Delete</button>
-                  ${Object.values(COLUMNS).filter(c => c !== column).map(c => `<button onclick="ui.moveTask('${task.id}', '${c}')" class="w-full text-left text-xs px-3 py-2 hover:opacity-70">→ ${COLUMN_INFO[c].title}</button>`).join('')}
+            <main class="flex-1 overflow-y-auto p-5">
+              <div class="max-w-7xl mx-auto">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  ${Object.values(COLUMNS).map(col => this.renderColumn(col)).join('')}
                 </div>
               </div>
-            </div>
-          </div>
-        `;
-      }
+            </main>
+          `;
+        }
 
-      renderStats() {
-        const all = this.taskManager.tasks;
-        const stats = {
-          total: all.length,
-          done: all.filter(t => t.completed).length,
-          today: all.filter(t => t.column === 'today').length,
-          soon: all.filter(t => t.column === 'soon').length,
-          future: all.filter(t => t.column === 'future').length
-        };
-
-        return `
-          <div class="card shadow-soft rounded-xl p-6">
-            <h3 class="font-bold mb-4">Overview</h3>
-            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-              <div class="text-center p-3 rounded-lg" style="background-color: ${this.isDark ? '#2a2a2a' : '#f9f9f9'}; border: 1px solid ${this.isDark ? '#3a3a3a' : '#eeeeee'};">
-                <div class="text-2xl font-bold">${stats.total}</div>
-                <p class="text-xs opacity-60 mt-1">Total</p>
+        renderColumn(column) {
+          const tasks = this.taskManager.getTasksByColumn(column);
+          const info = COLUMN_INFO[column];
+          return `
+            <div class="card shadow-soft rounded-xl p-4 flex flex-col h-full">
+              <div class="column-header relative pb-2 mb-2">
+                <h2 class="text-base font-bold" style="color: ${this.isDark ? '#e3eaf0' : '#1e2b37'};">${info.title}</h2>
               </div>
-              <div class="text-center p-3 rounded-lg" style="background-color: ${this.isDark ? '#2a2a2a' : '#f9f9f9'}; border: 1px solid ${this.isDark ? '#3a3a3a' : '#eeeeee'}; color: #666666;">
-                <div class="text-2xl font-bold">${stats.done}</div>
-                <p class="text-xs mt-1">Completed</p>
+
+              <div class="flex-1 overflow-y-auto mb-3 space-y-2 max-h-[420px]">
+                ${tasks.length === 0 
+                  ? `<div class="text-center py-5 text-sm opacity-40 border border-dashed rounded-lg">no tasks</div>` 
+                  : tasks.map(task => this.renderTask(task, column)).join('')}
               </div>
-              <div class="text-center p-3 rounded-lg" style="background-color: ${this.isDark ? '#2a2a2a' : '#f9f9f9'}; border: 1px solid ${this.isDark ? '#3a3a3a' : '#eeeeee'}; color: #777777;">
-                <div class="text-2xl font-bold">${stats.today}</div>
-                <p class="text-xs mt-1">Today</p>
-              </div>
-              <div class="text-center p-3 rounded-lg" style="background-color: ${this.isDark ? '#2a2a2a' : '#f9f9f9'}; border: 1px solid ${this.isDark ? '#3a3a3a' : '#eeeeee'}; color: #888888;">
-                <div class="text-2xl font-bold">${stats.soon}</div>
-                <p class="text-xs mt-1">This Week</p>
-              </div>
-              <div class="text-center p-3 rounded-lg" style="background-color: ${this.isDark ? '#2a2a2a' : '#f9f9f9'}; border: 1px solid ${this.isDark ? '#3a3a3a' : '#eeeeee'}; color: #999999;">
-                <div class="text-2xl font-bold">${stats.future}</div>
-                <p class="text-xs mt-1">Future</p>
+
+              <button onclick="ui.showAddForm('${column}')" class="w-full py-2 rounded-lg font-medium text-white transition hover:brightness-110 text-xs" style="background-color: ${info.color};">+ Add task</button>
+            </div>
+          `;
+        }
+
+        renderTask(task, column) {
+          const bgColor = this.isDark ? '#262e36' : '#fafbfc';
+          const borderColor = this.isDark ? '#3e4853' : '#edf0f2';
+          const highlightClass = (this.highlightedTaskId === task.id) ? 'task-highlight' : '';
+          const deleteVisible = task.completed ? 'visible' : '';
+          return `
+            <div id="task-${task.id}" class="task-item p-2 rounded-lg ${highlightClass}" style="background-color: ${bgColor}; border: 1px solid ${borderColor};">
+              <div class="flex items-center gap-2">
+                <!-- tick checkbox -->
+                <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''} onchange="ui.toggleTaskDone('${task.id}', this.checked)">
+
+                <!-- delete icon appears only when task is done -->
+                <span class="delete-icon ${deleteVisible}" onclick="ui.deleteTask('${task.id}')" title="delete">✕</span>
+
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium break-words ${task.completed ? 'line-through opacity-40' : ''}">${task.title}</p>
+                  ${task.description ? `<p class="text-xs opacity-50 break-words leading-tight">${task.description}</p>` : ''}
+                </div>
+
+                <!-- PEN ICON (replaces three dots) - opens edit modal directly -->
+                <button onclick="ui.showEditForm('${task.id}')" class="pen-icon" title="edit task">✎</button>
               </div>
             </div>
-          </div>
-        `;
-      }
+          `;
+        }
 
-      showAddForm(column) {
-        const info = COLUMN_INFO[column];
-        const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50';
-        modal.innerHTML = `
-          <div class="card rounded-xl p-6 w-full max-w-md">
-            <h3 class="text-xl font-bold mb-4">Add Task to ${info.title}</h3>
-            <input type="text" id="task-title" placeholder="Task title" class="w-full p-3 rounded-lg mb-3 border" style="border-color: #cccccc; background-color: ${this.isDark ? '#2a2a2a' : '#ffffff'};">
-            <textarea id="task-desc" placeholder="Description (optional)" class="w-full p-3 rounded-lg mb-4 border resize-none" rows="3" style="border-color: #cccccc; background-color: ${this.isDark ? '#2a2a2a' : '#ffffff'};"></textarea>
-            <div class="flex gap-3">
-              <button onclick="this.closest('.fixed').remove()" class="flex-1 py-2 rounded-lg" style="background-color: #e5e5e5; color: #1a1a1a;">Cancel</button>
-              <button onclick="ui.addTask('${column}'); this.closest('.fixed').remove();" class="flex-1 py-2 rounded-lg text-white font-medium" style="background-color: ${info.color};">Add</button>
+        toggleTaskDone(id, isChecked) {
+          const task = this.taskManager.tasks.find(t => t.id === id);
+          if (task) {
+            this.setHighlight(id);
+            this.taskManager.updateTask(id, { completed: isChecked });
+            setTimeout(() => {
+              this.highlightedTaskId = null;
+            }, 400);
+          }
+        }
+
+        deleteTask(id) {
+          this.taskManager.deleteTask(id);
+        }
+
+        // Add task with Enter key
+        showAddForm(column) {
+          const info = COLUMN_INFO[column];
+          const modal = document.createElement('div');
+          modal.className = 'fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50';
+          modal.innerHTML = `
+            <div class="card rounded-xl p-5 w-full max-w-sm">
+              <h3 class="text-lg font-bold mb-3">new task · ${info.title}</h3>
+              <input type="text" id="modal-title" placeholder="task title" class="w-full p-2 rounded-lg mb-2 border ${this.isDark ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-300'}">
+              <textarea id="modal-desc" placeholder="description (optional)" class="w-full p-2 rounded-lg mb-3 border resize-none ${this.isDark ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-300'}" rows="2"></textarea>
+              <div class="flex gap-2">
+                <button onclick="this.closest('.fixed').remove()" class="flex-1 py-1.5 rounded border">cancel</button>
+                <button onclick="ui.addTask('${column}'); this.closest('.fixed').remove();" class="flex-1 py-1.5 rounded text-white" style="background-color: ${info.color};">add</button>
+              </div>
             </div>
-          </div>
-        `;
-        document.body.appendChild(modal);
-        document.getElementById('task-title').focus();
-      }
+          `;
+          document.body.appendChild(modal);
+          const input = document.getElementById('modal-title');
+          input.focus();
+          const enterHandler = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              const addBtn = modal.querySelector('button:last-of-type');
+              if (addBtn) addBtn.click();
+            }
+          };
+          input.addEventListener('keydown', enterHandler);
+          const textarea = document.getElementById('modal-desc');
+          textarea.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              const addBtn = modal.querySelector('button:last-of-type');
+              if (addBtn) addBtn.click();
+            }
+          });
+          modal.addEventListener('remove', () => {
+            input.removeEventListener('keydown', enterHandler);
+          });
+        }
 
-      addTask(column) {
-        const title = document.getElementById('task-title').value.trim();
-        const desc = document.getElementById('task-desc').value.trim();
-        if (title) this.taskManager.addTask(title, column, desc);
-      }
+        addTask(column) {
+          const title = document.getElementById('modal-title')?.value.trim();
+          const desc = document.getElementById('modal-desc')?.value.trim() || '';
+          if (title) this.taskManager.addTask(title, column, desc);
+        }
 
-      showEditForm(id) {
-        const task = this.taskManager.tasks.find(t => t.id === id);
-        if (!task) return;
-
-        const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50';
-        modal.innerHTML = `
-          <div class="card rounded-xl p-6 w-full max-w-md">
-            <h3 class="text-xl font-bold mb-4">Edit Task</h3>
-            <input type="text" id="edit-title" value="${task.title}" class="w-full p-3 rounded-lg mb-3 border" style="border-color: #cccccc; background-color: ${this.isDark ? '#2a2a2a' : '#ffffff'};">
-            <textarea id="edit-desc" class="w-full p-3 rounded-lg mb-4 border resize-none" rows="3" style="border-color: #cccccc; background-color: ${this.isDark ? '#2a2a2a' : '#ffffff'};">${task.description}</textarea>
-            <div class="flex gap-3">
-              <button onclick="this.closest('.fixed').remove()" class="flex-1 py-2 rounded-lg" style="background-color: #e5e5e5; color: #1a1a1a;">Cancel</button>
-              <button onclick="ui.updateTask('${id}'); this.closest('.fixed').remove();" class="flex-1 py-2 rounded-lg text-white font-medium" style="background-color: #555555;">Save</button>
+        showEditForm(id) {
+          const task = this.taskManager.tasks.find(t => t.id === id);
+          if (!task) return;
+          const modal = document.createElement('div');
+          modal.className = 'fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50';
+          modal.innerHTML = `
+            <div class="card rounded-xl p-5 w-full max-w-sm">
+              <h3 class="text-lg font-bold mb-3">edit task</h3>
+              <input type="text" id="modal-edit-title" value="${this.escapeHtml(task.title)}" class="w-full p-2 rounded-lg mb-2 border ${this.isDark ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-300'}">
+              <textarea id="modal-edit-desc" class="w-full p-2 rounded-lg mb-3 border resize-none ${this.isDark ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-300'}" rows="2">${this.escapeHtml(task.description || '')}</textarea>
+              <div class="flex gap-2">
+                <button onclick="this.closest('.fixed').remove()" class="flex-1 py-1.5 rounded border">cancel</button>
+                <button onclick="ui.updateTask('${id}'); this.closest('.fixed').remove();" class="flex-1 py-1.5 rounded text-white" style="background-color: #4f5b66;">save</button>
+              </div>
             </div>
-          </div>
-        `;
-        document.body.appendChild(modal);
-        document.getElementById('edit-title').focus();
+          `;
+          document.body.appendChild(modal);
+          document.getElementById('modal-edit-title')?.focus();
+          const input = document.getElementById('modal-edit-title');
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              const saveBtn = modal.querySelector('button:last-of-type');
+              if (saveBtn) saveBtn.click();
+            }
+          });
+        }
+
+        updateTask(id) {
+          const title = document.getElementById('modal-edit-title')?.value.trim();
+          const desc = document.getElementById('modal-edit-desc')?.value.trim() || '';
+          if (title) this.taskManager.updateTask(id, { title, description: desc });
+        }
+
+        escapeHtml(str) {
+          return String(str).replace(/[&<>"]/g, function(m) {
+            if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; if (m === '"') return '&quot;';
+            return m;
+          });
+        }
       }
 
-      updateTask(id) {
-        const title = document.getElementById('edit-title').value.trim();
-        const desc = document.getElementById('edit-desc').value.trim();
-        if (title) this.taskManager.updateTask(id, { title, description: desc });
-      }
-
-      toggleTask(id) {
-        const task = this.taskManager.tasks.find(t => t.id === id);
-        if (task) this.taskManager.updateTask(id, { completed: !task.completed });
-      }
-
-      deleteTask(id) {
-        const task = this.taskManager.tasks.find(t => t.id === id);
-        if (!task) return;
-
-        const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50';
-        modal.innerHTML = `
-          <div class="card rounded-xl p-6 w-full max-w-md">
-            <h3 class="text-xl font-bold mb-2">Delete Task?</h3>
-            <p class="text-sm opacity-60 mb-4">"${task.title}" will be permanently removed.</p>
-            <div class="flex gap-3">
-              <button onclick="this.closest('.fixed').remove()" class="flex-1 py-2 rounded-lg" style="background-color: #e5e5e5; color: #1a1a1a;">Cancel</button>
-              <button onclick="ui.taskManager.deleteTask('${id}'); this.closest('.fixed').remove();" class="flex-1 py-2 rounded-lg text-white font-medium" style="background-color: #cc4444;">Delete</button>
-            </div>
-          </div>
-        `;
-        document.body.appendChild(modal);
-      }
-
-      moveTask(id, newColumn) {
-        this.taskManager.updateTask(id, { column: newColumn });
-      }
-
-      toggleMenu(id) {
-        const menu = document.getElementById(`menu-${id}`);
-        if (menu) menu.classList.toggle('hidden');
-      }
-    }
-
-    // Initialize
-    const taskManager = new TaskManager();
-    const ui = new UIManager(taskManager);
+      window.taskManager = new TaskManager();
+      window.ui = new UIManager(taskManager);
+    })();
   </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9d9f739557a6292c',t:'MTc3MzExNTYzNi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
-
+ </body>
 </html>
