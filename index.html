@@ -235,12 +235,146 @@
     body.dark-mode .loading-container {
       background: rgba(18, 18, 18, 0.8);
     }
+    
+    /* Loading container for initial auth check - fullscreen with blur */
+    .auth-loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(8px);
+      z-index: 2000;
+      transition: opacity 0.4s ease-out;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    body.dark-mode .auth-loading-overlay {
+      background: rgba(18, 18, 18, 0.92);
+    }
+    
+    .auth-loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid rgba(44, 62, 80, 0.15);
+      border-top: 4px solid #2c3e50;
+      border-radius: 50%;
+      animation: spin 0.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    
+    body.dark-mode .auth-loading-spinner {
+      border: 4px solid rgba(127, 153, 179, 0.2);
+      border-top: 4px solid #7f99b3;
+    }
+    
+    .auth-loading-text {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #4a5568;
+      letter-spacing: 0.3px;
+    }
+    
+    body.dark-mode .auth-loading-text {
+      color: #a0aec0;
+    }
+    
+    .auth-loading-sub {
+      font-size: 0.75rem;
+      opacity: 0.6;
+      margin-top: -8px;
+    }
 
     .add-task-btn {
       transition: transform 0.25s ease;
     }
     .add-task-btn:hover {
       transform: scale(1.05);
+    }
+
+    /* Drag & Drop Styles */
+    .task-item.dragging {
+      opacity: 0.5;
+      cursor: grabbing;
+    }
+
+    .task-item {
+      cursor: grab;
+    }
+
+    .column-drop-zone {
+      transition: background-color 0.2s ease;
+      min-height: 200px;
+    }
+
+    .column-drop-zone.drag-over {
+      background-color: rgba(44, 62, 80, 0.08);
+      border-radius: 8px;
+    }
+
+    body.dark-mode .column-drop-zone.drag-over {
+      background-color: rgba(127, 153, 179, 0.12);
+    }
+
+    /* Undo Toast Notification */
+    .undo-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2c3e50;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      z-index: 1400;
+      animation: slideUp 0.3s ease-out;
+    }
+
+    body.dark-mode .undo-toast {
+      background: #6b8c9e;
+    }
+
+    .undo-toast button {
+      background: rgba(255, 255, 255, 0.2);
+      border: none;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: background 0.2s;
+    }
+
+    .undo-toast button:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    @keyframes undoTimer {
+      to {
+        height: 0;
+      }
     }
 
     .login-btn {
@@ -695,14 +829,24 @@
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="https://cdn.tailwindcss.com/3.4.17" type="text/javascript"></script>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="/_sdk/element_sdk.js" type="text/javascript"></script>
  </head>
  <body class="h-full flex flex-col">
   <!-- Navigation Menu -->
   <div class="nav-menu" id="navMenu">
    <div class="nav-profile-section" id="navProfileSection"></div>
-   <div class="nav-item active" data-column="today">Today</div>
-   <div class="nav-item" data-column="soon">Soon</div>
-   <div class="nav-item" data-column="future">Future</div>
+   <div class="nav-item active" data-column="today">
+    Today
+   </div>
+   <div class="nav-item" data-column="soon">
+    Soon
+   </div>
+   <div class="nav-item" data-column="future">
+    Future
+   </div>
   </div>
   <div class="nav-overlay" id="navOverlay"></div>
   <div id="app" class="h-full flex flex-col overflow-hidden"></div>
@@ -740,6 +884,8 @@
           this.currentUser = null;
           this.unsubscribe = null;
           this.isLoading = true;
+          this.deletedTasks = [];
+          this.settings = { undoTimeMs: 5000 };
         }
 
         setUser(user) {
@@ -785,7 +931,18 @@
 
         async deleteTask(id) {
           if (!this.currentUser) return;
+          const task = this.tasks.find(t => t.id === id);
+          if (task) {
+            this.deletedTasks.push({ task, deleteTime: Date.now() });
+          }
           await db.collection('users').doc(this.currentUser.uid).collection('tasks').doc(id).delete();
+        }
+
+        async restoreTask(task) {
+          if (!this.currentUser) return;
+          const { id, ...taskData } = task;
+          await db.collection('users').doc(this.currentUser.uid).collection('tasks').doc(id).set(taskData);
+          this.deletedTasks = this.deletedTasks.filter(dt => dt.task.id !== id);
         }
 
         getTasksByColumn(column) {
@@ -807,14 +964,23 @@
           this.user = null;
           this.currentColumn = 'today';
           this.menuOpen = false;
+          this.authCheckComplete = false;
+          this.draggedTaskId = null;
+          this.draggedFromColumn = null;
           this.init();
         }
 
         init() {
           if (this.isDark) document.body.classList.add('dark-mode');
           
+          // Show loading overlay while checking auth state
+          this.showAuthLoadingOverlay();
+          
           auth.onAuthStateChanged((user) => {
             this.user = user;
+            this.authCheckComplete = true;
+            // Remove loading overlay once auth state is determined
+            this.hideAuthLoadingOverlay();
             this.taskManager.setUser(user);
             this.render();
             if (user) this.showUpdateNotification();
@@ -823,6 +989,29 @@
           this.taskManager.subscribe(() => this.render());
           this.render();
           setTimeout(() => this.setupEventListeners(), 100);
+        }
+
+        showAuthLoadingOverlay() {
+          if (document.getElementById('authLoadingOverlay')) return;
+          const overlay = document.createElement('div');
+          overlay.id = 'authLoadingOverlay';
+          overlay.className = 'auth-loading-overlay';
+          overlay.innerHTML = `
+            <div class="auth-loading-spinner"></div>
+            <div class="auth-loading-text">Checking session...</div>
+            <div class="auth-loading-sub">Loading your workspace</div>
+          `;
+          document.body.appendChild(overlay);
+        }
+
+        hideAuthLoadingOverlay() {
+          const overlay = document.getElementById('authLoadingOverlay');
+          if (overlay) {
+            overlay.style.opacity = '0';
+            setTimeout(() => {
+              if (overlay && overlay.parentNode) overlay.remove();
+            }, 300);
+          }
         }
 
         showUpdateNotification() {
@@ -866,6 +1055,58 @@
           const toggleSwitch = document.getElementById('toggleSwitch');
           if (toggleSwitch) toggleSwitch.onclick = (e) => { e.preventDefault(); this.toggleDarkMode(); };
           if (navMenu) navMenu.onclick = (e) => e.stopPropagation();
+          
+          // Setup drag and drop
+          this.setupDragAndDrop();
+        }
+
+        setupDragAndDrop() {
+          document.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('task-item')) {
+              this.draggedTaskId = e.target.id.replace('task-', '');
+              this.draggedFromColumn = null;
+              for (const col of ['today', 'soon', 'future']) {
+                const tasks = this.taskManager.getTasksByColumn(col);
+                if (tasks.find(t => t.id === this.draggedTaskId)) {
+                  this.draggedFromColumn = col;
+                  break;
+                }
+              }
+              e.target.classList.add('dragging');
+              e.dataTransfer.effectAllowed = 'move';
+            }
+          });
+
+          document.addEventListener('dragend', (e) => {
+            e.target.classList.remove('dragging');
+            document.querySelectorAll('.column-drop-zone').forEach(zone => {
+              zone.classList.remove('drag-over');
+            });
+          });
+
+          document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const zone = e.target.closest('.column-drop-zone');
+            if (zone) {
+              document.querySelectorAll('.column-drop-zone').forEach(z => {
+                z.classList.remove('drag-over');
+              });
+              zone.classList.add('drag-over');
+            }
+          });
+
+          document.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            const zone = e.target.closest('.column-drop-zone');
+            if (zone && this.draggedTaskId) {
+              const targetColumn = zone.dataset.column;
+              const task = this.taskManager.tasks.find(t => t.id === this.draggedTaskId);
+              if (task && targetColumn && targetColumn !== this.draggedFromColumn) {
+                await this.taskManager.updateTask(this.draggedTaskId, { column: targetColumn });
+              }
+            }
+          });
         }
 
         toggleMenu() { this.menuOpen ? this.closeMenu() : this.openMenu(); }
@@ -903,7 +1144,6 @@
           if (!this.user) {
             app.innerHTML = this.getLoginHTML();
           } else {
-            // Show loading state while tasks are being fetched
             if (this.taskManager.isLoading) {
               app.innerHTML = this.getLoadingHTML();
             } else {
@@ -1028,7 +1268,7 @@
               <div class="column-header relative pb-2 mb-4">
                 <h2 class="text-base font-bold" style="color: ${info.color};">${info.title}</h2>
               </div>
-              <div class="flex-1 space-y-2 mb-4">
+              <div class="column-drop-zone flex-1 space-y-2 mb-4" data-column="${column}">
                 ${tasks.length === 0 ? `<div class="text-center py-12 text-sm opacity-40">no tasks yet</div>` : tasks.map(task => this.renderTask(task)).join('')}
               </div>
               <button onclick="ui.showAddForm('${column}')" class="add-task-btn w-full py-3 rounded-lg font-medium text-white transition" style="background-color: ${info.color};">+ Add task</button>
@@ -1042,7 +1282,7 @@
           const highlightClass = (this.highlightedTaskId === task.id) ? 'task-highlight' : '';
           const deleteVisible = task.completed ? 'visible' : '';
           return `
-            <div id="task-${task.id}" class="task-item p-3 rounded-lg ${highlightClass}" style="background-color: ${bgColor}; border: 1px solid ${borderColor};">
+            <div id="task-${task.id}" class="task-item p-3 rounded-lg ${highlightClass}" style="background-color: ${bgColor}; border: 1px solid ${borderColor};" draggable="true">
               <div class="flex items-center gap-2">
                 <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''} onchange="ui.toggleTaskDone('${task.id}', this.checked)">
                 <span class="delete-icon ${deleteVisible}" onclick="ui.deleteTask('${task.id}')" title="delete">✕</span>
@@ -1057,7 +1297,42 @@
         }
 
         async toggleTaskDone(id, isChecked) { this.setHighlight(id); await this.taskManager.updateTask(id, { completed: isChecked }); setTimeout(() => { this.highlightedTaskId = null; }, 400); }
-        async deleteTask(id) { await this.taskManager.deleteTask(id); }
+        
+        async deleteTask(id) { 
+          await this.taskManager.deleteTask(id); 
+          this.showUndoToast(id);
+        }
+
+        showUndoToast(taskId) {
+          const deletedTaskWrapper = this.taskManager.deletedTasks[this.taskManager.deletedTasks.length - 1];
+          if (!deletedTaskWrapper) return;
+          
+          const toast = document.createElement('div');
+          toast.className = 'undo-toast';
+          toast.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px; width: 100%;">
+              <span>Task deleted</span>
+              <button onclick="ui.undoDelete('${taskId}')" style="background: rgba(255, 255, 255, 0.2); border: none; color: white; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 0.85rem; transition: background 0.2s;">Undo</button>
+            </div>
+            <div style="width: 3px; height: 20px; background: #fbbf24; border-radius: 2px; animation: undoTimer 5s linear forwards; margin-left: 12px;"></div>
+          `;
+          document.body.appendChild(toast);
+          
+          setTimeout(() => {
+            if (toast.parentNode) {
+              toast.remove();
+            }
+          }, this.taskManager.settings.undoTimeMs);
+        }
+
+        async undoDelete(taskId) {
+          const deletedTaskWrapper = this.taskManager.deletedTasks.find(dt => dt.task.id === taskId);
+          if (deletedTaskWrapper) {
+            await this.taskManager.restoreTask(deletedTaskWrapper.task);
+            const toasts = document.querySelectorAll('.undo-toast');
+            toasts.forEach(t => t.remove());
+          }
+        }
 
         showAddForm(column) {
           const info = COLUMN_INFO[column];
@@ -1075,7 +1350,14 @@
             </div>
           `;
           document.body.appendChild(modal);
-          document.getElementById('modal-title')?.focus();
+          const titleInput = document.getElementById('modal-title');
+          titleInput?.focus();
+          titleInput?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && titleInput.value.trim()) {
+              ui.addTask(column);
+              modal.remove();
+            }
+          });
         }
 
         async addTask(column) { const title = document.getElementById('modal-title')?.value.trim(); const desc = document.getElementById('modal-desc')?.value.trim() || ''; if (title) await this.taskManager.addTask(title, column, desc); }
@@ -1097,7 +1379,14 @@
             </div>
           `;
           document.body.appendChild(modal);
-          document.getElementById('modal-edit-title')?.focus();
+          const titleInput = document.getElementById('modal-edit-title');
+          titleInput?.focus();
+          titleInput?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && titleInput.value.trim()) {
+              ui.updateTask(id);
+              modal.remove();
+            }
+          });
         }
 
         async updateTask(id) { const title = document.getElementById('modal-edit-title')?.value.trim(); const desc = document.getElementById('modal-edit-desc')?.value.trim() || ''; if (title) await this.taskManager.updateTask(id, { title, description: desc }); }
@@ -1126,5 +1415,5 @@
       window.ui = new UIManager(taskManager);
     })();
   </script>
- </body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9e1320ad407c2933',t:'MTc3NDMyODU4OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
