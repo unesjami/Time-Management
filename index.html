@@ -9,7 +9,6 @@
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
@@ -216,8 +215,9 @@
 
       const addTask = useCallback(async (data) => {
         if (!user) return;
-        const newTask = { ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp(), completed: false };
-        await db.collection('users').doc(user.uid).collection('tasks').add(newTask);
+        // For "New Ideas" column we always use column = 'newIdeas' (not 'future')
+        const finalData = { ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp(), completed: false };
+        await db.collection('users').doc(user.uid).collection('tasks').add(finalData);
       }, [user]);
 
       const updateTask = useCallback(async (id, updates) => {
@@ -260,7 +260,6 @@
     }
 
     // ---------- COMPONENTS ----------
-    // Large analog clock with digital time inside
     function LargeLiveClock({ tasksToday, is24Hour }) {
       const [currentTime, setCurrentTime] = useState(new Date());
       useEffect(() => {
@@ -514,7 +513,13 @@
     }
 
     function Column({ column, title, tasks, onAdd, onUpdate, onDelete, onToggle, showCounter, is24Hour, isIdea = false, isSoon = false, collapsed, onToggleCollapse }) {
-      const columnTasks = tasks.filter(t => t.column === column).sort((a,b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+      // For "New Ideas" column, we include both 'newIdeas' and legacy 'future'
+      const columnTasks = tasks.filter(t => {
+        if (column === 'newIdeas') {
+          return t.column === 'newIdeas' || t.column === 'future';
+        }
+        return t.column === column;
+      }).sort((a,b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
       const completedCount = columnTasks.filter(t => t.completed).length;
       return (
         <div className="flex flex-col h-full">
@@ -535,7 +540,7 @@
                 {columnTasks.length === 0 && <div className="text-center py-5 text-xs opacity-40">No {isIdea ? 'ideas' : 'tasks'}</div>}
                 {columnTasks.map(task => <TaskCard key={task.id} task={task} onToggle={()=>onToggle(task.id, task.completed)} onDelete={()=>onDelete(task.id)} onUpdate={(updates)=>onUpdate(task.id, updates)} is24Hour={is24Hour} isIdea={isIdea} isSoon={isSoon} />)}
               </div>
-              <AddTaskForm column={column} onAdd={onAdd} isIdea={isIdea} isSoon={isSoon} />
+              <AddTaskForm column={column === 'newIdeas' ? 'newIdeas' : column} onAdd={onAdd} isIdea={isIdea} isSoon={isSoon} />
             </>
           )}
         </div>
@@ -548,7 +553,7 @@
       return (
         <div className="fixed bottom-3 right-3 z-50 flex flex-col gap-2 items-end">
           {undoStack.map(item => {
-            const isIdea = item.task.column === 'newIdeas';
+            const isIdea = item.task.column === 'newIdeas' || item.task.column === 'future';
             const progress = item.remaining / 5;
             const offset = circumference * (1 - progress);
             return (
@@ -643,7 +648,6 @@
       return (
         <div className="min-h-screen p-4">
           <div className="max-w-7xl mx-auto">
-            {/* Top bar: settings icon on right */}
             <div className="flex justify-end mb-4">
               <button onClick={()=>setSettingsOpen(true)} className="p-2 rounded-md hover:bg-black/5 transition-colors">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -653,9 +657,7 @@
               </button>
             </div>
 
-            {/* Three columns row + right sidebar (clock + next/missed) */}
             <div className="flex flex-col lg:flex-row gap-6">
-              {/* Columns grid - takes 2/3 width on large screens */}
               <div className="flex-1">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   {columns.map(col => (
@@ -679,7 +681,6 @@
                 </div>
               </div>
               
-              {/* Right sidebar - fixed width, contains clock and next/missed */}
               <div className="lg:w-80 flex-shrink-0 space-y-6">
                 <LargeLiveClock tasksToday={todayTasks} is24Hour={is24Hour} />
                 <NextUpAndMissed tasksToday={todayTasks} is24Hour={is24Hour} />
