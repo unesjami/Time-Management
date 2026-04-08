@@ -13,7 +13,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
   <style>
-    /* (styles unchanged, same as original) */
     @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap');
@@ -269,7 +268,7 @@
       "Time decides who you meet in life, your heart decides who you want in your life, and your behavior decides who stays. — Unknown"
     ];
 
-    // ---------- PARTICLE BACKGROUND (no blur) ----------
+    // ---------- PARTICLE BACKGROUND ----------
     let particleAnimationId = null;
     let particleCtx = null;
     let particleCanvas = null;
@@ -466,6 +465,17 @@
       const minuteDeg = (minutes / 60) * 360 + (seconds / 60) * 6;
       const secondDeg = (seconds / 60) * 360;
       
+      let displayHours = hours;
+      let ampm = '';
+      if (!is24Hour) {
+        ampm = hours >= 12 ? 'PM' : 'AM';
+        displayHours = hours % 12 || 12;
+      }
+      const digitalTimeStr = is24Hour 
+        ? `${displayHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+        : `${displayHours}:${minutes.toString().padStart(2, '0')}`;
+      const digitalFull = is24Hour ? digitalTimeStr : `${digitalTimeStr} ${ampm}`;
+      
       const size = 150;
       const center = size/2;
       const radius = size * 0.42;
@@ -538,11 +548,21 @@
       );
     }
 
+    // FIXED: Real‑time missed tasks (updates every 10 seconds)
     function NextUpAndMissed({ tasksToday, is24Hour }) {
-      const now = getCurrentMinutes();
+      const [now, setNow] = useState(getCurrentMinutes());
+      const [animatingIds, setAnimatingIds] = useState([]);
+
+      // Update current time every 10 seconds to refresh missed tasks
+      useEffect(() => {
+        const interval = setInterval(() => {
+          setNow(getCurrentMinutes());
+        }, 10000);
+        return () => clearInterval(interval);
+      }, []);
+
       const nextTask = tasksToday.filter(t => !t.completed && t.startTime && timeToMin(t.startTime) > now).sort((a,b) => timeToMin(a.startTime) - timeToMin(b.startTime))[0];
       const missedTasks = tasksToday.filter(t => !t.completed && t.endTime && timeToMin(t.endTime) <= now && timeToMin(t.endTime) > 0);
-      const [animatingIds, setAnimatingIds] = useState([]);
       
       useEffect(() => {
         const newCompleted = tasksToday.filter(t => t.completed && t.endTime && timeToMin(t.endTime) <= now && timeToMin(t.endTime) > 0);
@@ -553,7 +573,7 @@
             setAnimatingIds(prev => prev.filter(id => !justCompleted.some(t => t.id === id)));
           }, 250);
         }
-      }, [tasksToday]);
+      }, [tasksToday, now]);
       
       const visibleMissed = missedTasks.filter(t => !animatingIds.includes(t.id));
       return (
@@ -736,21 +756,18 @@
       
       // Apply sorting based on column type
       if (column === 'today') {
-        // Sort by startTime (earliest first). Tasks without time go to bottom.
         columnTasks.sort((a, b) => {
           const aTime = a.startTime ? timeToMin(a.startTime) : Infinity;
           const bTime = b.startTime ? timeToMin(b.startTime) : Infinity;
           return aTime - bTime;
         });
       } else if (column === 'soon') {
-        // Sort by dueDate (earliest first). Tasks without date go to bottom.
         columnTasks.sort((a, b) => {
           const aDate = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
           const bDate = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
           return aDate - bDate;
         });
       } else {
-        // For newIdeas, sort by creation date (oldest first)
         columnTasks.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
       }
       
@@ -846,7 +863,6 @@
       const [authLoading, setAuthLoading] = useState(true);
       const [is24Hour, setIs24Hour] = useState(false);
       const [autoResetToday, setAutoResetToday] = useState(() => localStorage.getItem("autoResetToday") !== "false");
-      // Main page: Focus background default ON
       const [focusBgEnabled, setFocusBgEnabled] = useState(() => {
         const stored = localStorage.getItem("focusBgEnabled");
         return stored === null ? true : stored === "true";
@@ -857,7 +873,6 @@
       const { tasks, loading, addTask, updateTask, deleteTask, toggleCompleted, undoStack, undoDelete } = useFirestoreTasks(user, autoResetToday);
       const [loadingQuote] = useState(() => timeFacts[Math.floor(Math.random() * timeFacts.length)]);
 
-      // Control particles on main page based on toggle
       useEffect(() => {
         if (focusBgEnabled) {
           initParticleCanvas();
@@ -893,8 +908,6 @@
         );
       }
       if (!user) {
-        // Sign-in page: always show particles (Focus background ON)
-        // Ensure particles are running
         setTimeout(() => {
           const canvas = document.getElementById('particle-canvas');
           if (canvas && !particleAnimationId) {
@@ -917,7 +930,6 @@
         );
       }
 
-      // After sign-in, show loading while tasks are fetched
       if (loading) {
         return (
           <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #0f2027, #203a43, #2c5364)' }}>
