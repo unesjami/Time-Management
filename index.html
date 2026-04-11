@@ -16,6 +16,7 @@
     @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap');
     @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap');
 
     :root {
       --background: 0 0% 98%;
@@ -68,6 +69,9 @@
       margin: 0;
       padding: 0;
       min-height: 100vh;
+    }
+    .persian-font {
+      font-family: 'Vazirmatn', 'Inter', sans-serif;
     }
     #particle-canvas {
       position: fixed;
@@ -236,6 +240,28 @@
     }
     function getTodayDate() {
       return new Date().toISOString().slice(0,10);
+    }
+
+    // ---------- PERSIAN CALENDAR (Jalali) ----------
+    const persianMonths = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
+    const afghaniMonths = ['حمل', 'ثور', 'جوزا', 'سرطان', 'اسد', 'سنبله', 'میزان', 'عقرب', 'قوس', 'جدی', 'دلو', 'حوت'];
+    const persianWeekdays = ['یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنج‌شنبه', 'جمعه', 'شنبه'];
+
+    function gregorianToJalali(gy, gm, gd) {
+      const g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+      let jy = (gy <= 1600) ? 0 : 979;
+      gy -= (gy <= 1600) ? 621 : 1600;
+      const gy2 = (gm > 2) ? (gy + 1) : gy;
+      let days = (365 * gy) + (Math.floor((gy2 + 3) / 4)) - (Math.floor((gy2 + 99) / 100)) + (Math.floor((gy2 + 399) / 400)) - 80 + gd + g_d_m[gm - 1];
+      const jy2 = jy + 33 * Math.floor(days / 12053);
+      days %= 12053;
+      let jy3 = jy2 + 4 * Math.floor(days / 1461);
+      days %= 1461;
+      jy3 = jy3 + Math.floor((days - 1) / 365);
+      if (days > 365) days = (days - 1) % 365;
+      const jm = (days < 186) ? 1 + Math.floor(days / 31) : 7 + Math.floor((days - 186) / 30);
+      const jd = 1 + ((days < 186) ? (days % 31) : ((days - 186) % 30));
+      return { year: jy3, month: jm, day: jd };
     }
 
     // ---------- LOADING QUOTES ----------
@@ -465,17 +491,6 @@
       const minuteDeg = (minutes / 60) * 360 + (seconds / 60) * 6;
       const secondDeg = (seconds / 60) * 360;
       
-      let displayHours = hours;
-      let ampm = '';
-      if (!is24Hour) {
-        ampm = hours >= 12 ? 'PM' : 'AM';
-        displayHours = hours % 12 || 12;
-      }
-      const digitalTimeStr = is24Hour 
-        ? `${displayHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
-        : `${displayHours}:${minutes.toString().padStart(2, '0')}`;
-      const digitalFull = is24Hour ? digitalTimeStr : `${digitalTimeStr} ${ampm}`;
-      
       const size = 150;
       const center = size/2;
       const radius = size * 0.42;
@@ -522,12 +537,25 @@
       );
     }
 
+    // UPDATED: LargeNumericalClock now includes Persian date below the Gregorian date
     function LargeNumericalClock({ is24Hour }) {
       const [currentTime, setCurrentTime] = useState(new Date());
+      const [persianDate, setPersianDate] = useState({ year: 0, month: 0, day: 0, weekday: 0 });
+      
       useEffect(() => {
-        const interval = setInterval(() => setCurrentTime(new Date()), 100);
+        const interval = setInterval(() => {
+          const now = new Date();
+          setCurrentTime(now);
+          const year = now.getFullYear();
+          const month = now.getMonth() + 1;
+          const day = now.getDate();
+          const weekday = now.getDay();
+          const jalali = gregorianToJalali(year, month, day);
+          setPersianDate({ year: jalali.year, month: jalali.month, day: jalali.day, weekday });
+        }, 100);
         return () => clearInterval(interval);
       }, []);
+      
       let hours = currentTime.getHours();
       const minutes = currentTime.getMinutes().toString().padStart(2, '0');
       const hoursStr = hours.toString().padStart(2, '0');
@@ -537,23 +565,38 @@
         ampm = hours >= 12 ? 'PM' : 'AM';
       }
       const displayTime = is24Hour ? `${hoursStr}:${minutes}` : `${(hours % 12 || 12).toString().padStart(2, '0')}:${minutes}`;
+      
+      // Format Persian date: "weekday، day month_name (alt_month_name) year"
+      let persianDateStr = '';
+      if (persianDate.year !== 0) {
+        const weekdayName = persianWeekdays[persianDate.weekday];
+        const afghaniName = afghaniMonths[persianDate.month - 1];
+        const iranianName = persianMonths[persianDate.month - 1];
+        persianDateStr = `${weekdayName}، ${persianDate.day} ${afghaniName} (${iranianName}) ${persianDate.year}`;
+      }
+      
       return (
         <div>
           <div className="large-numerical-clock">{displayTime}</div>
-          <div className="flex justify-between items-center mt-1 text-xs text-muted-foreground">
-            <span>{dateStr}</span>
-            {!is24Hour && <span className="ml-2">{ampm}</span>}
+          <div className="flex flex-col mt-1 text-xs text-muted-foreground">
+            <div className="flex justify-between items-center">
+              <span>{dateStr}</span>
+              {!is24Hour && <span className="ml-2">{ampm}</span>}
+            </div>
+            {persianDateStr && (
+              <div className="persian-font text-right mt-0.5 text-[0.7rem] opacity-80">
+                {persianDateStr}
+              </div>
+            )}
           </div>
         </div>
       );
     }
 
-    // FIXED: Real‑time missed tasks (updates every 10 seconds)
     function NextUpAndMissed({ tasksToday, is24Hour }) {
       const [now, setNow] = useState(getCurrentMinutes());
       const [animatingIds, setAnimatingIds] = useState([]);
 
-      // Update current time every 10 seconds to refresh missed tasks
       useEffect(() => {
         const interval = setInterval(() => {
           setNow(getCurrentMinutes());
@@ -754,7 +797,6 @@
         return t.column === column;
       });
       
-      // Apply sorting based on column type
       if (column === 'today') {
         columnTasks.sort((a, b) => {
           const aTime = a.startTime ? timeToMin(a.startTime) : Infinity;
