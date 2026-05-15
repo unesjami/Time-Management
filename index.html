@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Time Management · Smart Planner</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>TimeOS · Smart Planner</title>
   <link rel="icon" type="image/png" href="https://i.ibb.co/wZCzhSfW/2task-manager-favicon.png">
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -280,18 +280,7 @@
       "The bad news is time flies. The good news is you're the pilot. — Michael Altshuler",
       "Time is more valuable than money. You can get more money, but you cannot get more time. — Jim Rohn",
       "The two most powerful warriors are patience and time. — Leo Tolstoy",
-      "Time brings all things to pass. — Aeschylus",
-      "Time is a created thing. To say 'I don't have time' is to say 'I don't want to'. — Lao Tzu",
-      "They always say time changes things, but you actually have to change them yourself. — Andy Warhol",
-      "Time is a great teacher, but unfortunately it kills all its pupils. — Hector Berlioz",
-      "One day, you will wake up and there won't be any more time to do the things you've always wanted. — Paulo Coelho",
-      "Time is the longest distance between two places. — Tennessee Williams",
-      "The only reason for time is so that everything doesn't happen at once. — Albert Einstein",
-      "Time is a sort of river of passing events, and strong is its current. — Marcus Aurelius",
-      "Don't watch the clock; do what it does. Keep going. — Sam Levenson",
-      "Time is free, but it's priceless. You can't own it, but you can use it. — Harvey Mackay",
-      "The best time to plant a tree was 20 years ago. The second best time is now. — Chinese Proverb",
-      "Time decides who you meet in life, your heart decides who you want in your life, and your behavior decides who stays. — Unknown"
+      "Time brings all things to pass. — Aeschylus"
     ];
 
     // ---------- PARTICLE BACKGROUND ----------
@@ -394,7 +383,7 @@
       const [loading, setLoading] = useState(true);
       const [undoStack, setUndoStack] = useState([]);
 
-      // Daily reset for "today" column
+      // Daily reset for "today" column — FIXED: NO manual state merging, rely on Firestore snapshot
       useEffect(() => {
         if (!user || !autoResetToday) return;
         const performReset = async () => {
@@ -403,22 +392,19 @@
           if (lastReset !== today) {
             const todayTasksRef = db.collection('users').doc(user.uid).collection('tasks');
             const snapshot = await todayTasksRef.where('column', '==', 'today').where('completed', '==', true).get();
-            const batch = db.batch();
-            snapshot.forEach(doc => batch.update(doc.ref, { completed: false }));
-            await batch.commit();
+            if (!snapshot.empty) {
+              const batch = db.batch();
+              snapshot.forEach(doc => batch.update(doc.ref, { completed: false }));
+              await batch.commit();
+              // Firestore onSnapshot will automatically sync updated tasks — no manual setTasks to avoid duplication/loss
+            }
             localStorage.setItem(`lastReset_${user.uid}`, today);
-            const newSnapshot = await todayTasksRef.get();
-            const updatedTasks = [];
-            newSnapshot.forEach(doc => updatedTasks.push({ id: doc.id, ...doc.data() }));
-            setTasks(prev => {
-              const otherTasks = prev.filter(t => t.column !== 'today');
-              return [...otherTasks, ...updatedTasks];
-            });
           }
         };
         performReset();
       }, [user, autoResetToday]);
 
+      // Real-time listener
       useEffect(() => {
         if (!user) { setTasks([]); setLoading(false); return; }
         setLoading(true);
@@ -537,7 +523,6 @@
       );
     }
 
-    // UPDATED: LargeNumericalClock now includes Persian date below the Gregorian date
     function LargeNumericalClock({ is24Hour }) {
       const [currentTime, setCurrentTime] = useState(new Date());
       const [persianDate, setPersianDate] = useState({ year: 0, month: 0, day: 0, weekday: 0 });
@@ -566,7 +551,6 @@
       }
       const displayTime = is24Hour ? `${hoursStr}:${minutes}` : `${(hours % 12 || 12).toString().padStart(2, '0')}:${minutes}`;
       
-      // Format Persian date: "weekday، day month_name (alt_month_name) year"
       let persianDateStr = '';
       if (persianDate.year !== 0) {
         const weekdayName = persianWeekdays[persianDate.weekday];
@@ -598,9 +582,7 @@
       const [animatingIds, setAnimatingIds] = useState([]);
 
       useEffect(() => {
-        const interval = setInterval(() => {
-          setNow(getCurrentMinutes());
-        }, 10000);
+        const interval = setInterval(() => setNow(getCurrentMinutes()), 10000);
         return () => clearInterval(interval);
       }, []);
 
@@ -612,9 +594,7 @@
         const justCompleted = newCompleted.filter(t => !animatingIds.includes(t.id));
         if (justCompleted.length) {
           setAnimatingIds(prev => [...prev, ...justCompleted.map(t => t.id)]);
-          setTimeout(() => {
-            setAnimatingIds(prev => prev.filter(id => !justCompleted.some(t => t.id === id)));
-          }, 250);
+          setTimeout(() => setAnimatingIds(prev => prev.filter(id => !justCompleted.some(t => t.id === id))), 250);
         }
       }, [tasksToday, now]);
       
@@ -642,7 +622,7 @@
       );
     }
 
-    function TaskCard({ task, onToggle, onDelete, onUpdate, is24Hour, isIdea = false, isSoon = false, columnType }) {
+    function TaskCard({ task, onToggle, onDelete, onUpdate, is24Hour, isIdea = false, columnType }) {
       const [editing, setEditing] = useState(false);
       const [editTitle, setEditTitle] = useState(task.title);
       const [editDesc, setEditDesc] = useState(task.description || "");
@@ -652,20 +632,16 @@
       const textareaRef = useRef(null);
       
       const cardClass = columnType === 'today' ? 'task-card-today' : (columnType === 'soon' ? 'task-card-soon' : 'task-card-ideas');
-      const dateBadgeClass = columnType === 'today' ? 'date-badge-today' : (columnType === 'soon' ? 'date-badge-soon' : 'date-badge-ideas');
       
       const save = () => {
         const updates = { title: editTitle, description: editDesc };
-        if (!isIdea && !isSoon) { 
+        if (!isIdea && columnType !== 'soon') { 
           updates.startTime = editStart || null; 
           updates.endTime = editEnd || null; 
         }
-        if (isSoon) { updates.dueDate = editDueDate || null; }
+        if (columnType === 'soon') { updates.dueDate = editDueDate || null; }
         onUpdate(updates);
         setEditing(false);
-      };
-      const handleKeyDown = (e, field) => {
-        if (field === 'title' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); }
       };
       useEffect(() => {
         if (textareaRef.current) {
@@ -677,16 +653,16 @@
       if (editing) {
         return (
           <div className={`${cardClass} p-3 animate-scale-in space-y-2`}>
-            <input className="w-full rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-1" style={{background:`hsl(var(--secondary))`}} value={editTitle} onChange={e=>setEditTitle(e.target.value)} onKeyDown={(e)=>handleKeyDown(e,'title')} placeholder={isIdea ? "Idea title" : "Task title"} autoFocus />
-            <textarea ref={textareaRef} className="w-full rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-1 auto-expand-textarea" rows="1" style={{background:`hsl(var(--secondary))`}} value={editDesc} onChange={e=>setEditDesc(e.target.value)} onKeyDown={e=>{if(e.key==='Enter' && e.shiftKey){}else if(e.key==='Enter' && !e.shiftKey){e.preventDefault(); save();}}} placeholder="Description" />
-            {!isIdea && !isSoon && (
+            <input className="w-full rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-1" style={{background:`hsl(var(--secondary))`}} value={editTitle} onChange={e=>setEditTitle(e.target.value)} placeholder={isIdea ? "Idea title" : "Task title"} autoFocus />
+            <textarea ref={textareaRef} className="w-full rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-1 auto-expand-textarea" rows="1" style={{background:`hsl(var(--secondary))`}} value={editDesc} onChange={e=>setEditDesc(e.target.value)} placeholder="Description" />
+            {!isIdea && columnType !== 'soon' && (
               <div className="flex gap-2 items-center">
                 <input type="time" value={editStart} onChange={e=>setEditStart(e.target.value)} className="rounded-lg px-2 py-1 text-sm outline-none" style={{background:`hsl(var(--secondary))`}} />
                 <span className="text-xs">to</span>
                 <input type="time" value={editEnd} onChange={e=>setEditEnd(e.target.value)} className="rounded-lg px-2 py-1 text-sm outline-none" style={{background:`hsl(var(--secondary))`}} />
               </div>
             )}
-            {isSoon && (
+            {columnType === 'soon' && (
               <div className="flex gap-2 items-center">
                 <input type="date" value={editDueDate} onChange={e=>setEditDueDate(e.target.value)} className="rounded-lg px-2 py-1 text-sm outline-none" style={{background:`hsl(var(--secondary))`}} />
               </div>
@@ -707,11 +683,11 @@
             <div className="flex-1 min-w-0">
               <p className={`text-sm font-medium leading-tight ${task.completed ? 'line-through opacity-60' : ''}`}>{task.title}</p>
               {task.description && <p className="text-xs opacity-60 mt-0.5 whitespace-pre-wrap">{task.description}</p>}
-              {!isIdea && !isSoon && task.startTime && task.endTime && (
+              {!isIdea && columnType !== 'soon' && task.startTime && task.endTime && (
                 <span className="inline-block mt-1 text-[11px] font-medium rounded-md px-2 py-0.5" style={{background:`hsl(var(--primary)/0.1)`, color:`hsl(var(--primary))`}}>{formatRange(task.startTime, task.endTime, is24Hour)}</span>
               )}
-              {isSoon && task.dueDate && (
-                <span className={`inline-block mt-1 text-[11px] font-medium rounded-md px-2 py-0.5 ${dateBadgeClass}`}>{formatDateOnly(task.dueDate)}</span>
+              {columnType === 'soon' && task.dueDate && (
+                <span className={`inline-block mt-1 text-[11px] font-medium rounded-md px-2 py-0.5 date-badge-soon`}>{formatDateOnly(task.dueDate)}</span>
               )}
             </div>
             <div className="flex items-center gap-0.5">
@@ -750,9 +726,7 @@
         onAdd(base);
         setTitle(""); setDesc(""); setStartTime(""); setEndTime(""); setDueDate(""); setOpen(false);
       };
-      const handleKey = (e, field) => {
-        if (field === 'title' && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
-      };
+      
       if (!open) {
         return (
           <button onClick={()=>setOpen(true)} className="w-full mt-2 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/5" style={{border:`1px dashed hsl(var(--border))`, color:`hsl(var(--muted-foreground))`}}>
@@ -765,8 +739,8 @@
           <div className="modal-content w-full max-w-sm" onClick={(e)=>e.stopPropagation()}>
             <div className="task-card-today p-4 animate-scale-in space-y-3">
               <h3 className="font-semibold text-sm">{isIdea ? "Add New Idea" : "Add New Task"}</h3>
-              <input className="w-full rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-1" style={{background:`hsl(var(--secondary))`}} value={title} onChange={e=>setTitle(e.target.value)} onKeyDown={e=>handleKey(e,'title')} placeholder={isIdea ? "Idea title" : "Task title"} autoFocus />
-              <textarea ref={textareaRef} className="w-full rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-1 auto-expand-textarea" rows="1" style={{background:`hsl(var(--secondary))`}} value={desc} onChange={e=>setDesc(e.target.value)} onKeyDown={e=>{if(e.key==='Enter' && e.shiftKey){}else if(e.key==='Enter' && !e.shiftKey){e.preventDefault(); submit();}}} placeholder="Description" />
+              <input className="w-full rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-1" style={{background:`hsl(var(--secondary))`}} value={title} onChange={e=>setTitle(e.target.value)} placeholder={isIdea ? "Idea title" : "Task title"} autoFocus />
+              <textarea ref={textareaRef} className="w-full rounded-lg px-2 py-1.5 text-sm outline-none focus:ring-1 auto-expand-textarea" rows="1" style={{background:`hsl(var(--secondary))`}} value={desc} onChange={e=>setDesc(e.target.value)} placeholder="Description" />
               {!isIdea && !isSoon && (
                 <div className="flex gap-2 items-center">
                   <input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)} className="rounded-lg px-2 py-1 text-sm outline-none" style={{background:`hsl(var(--secondary))`}} />
@@ -792,23 +766,15 @@
     function Column({ column, title, tasks, onAdd, onUpdate, onDelete, onToggle, showCounter, is24Hour, isIdea = false, isSoon = false, collapsed, onToggleCollapse }) {
       let columnTasks = tasks.filter(t => {
         if (column === 'newIdeas') {
-          return t.column === 'newIdeas' || t.column === 'future';
+          return t.column === 'newIdeas' || t.column === 'future'; // backward compact
         }
         return t.column === column;
       });
       
       if (column === 'today') {
-        columnTasks.sort((a, b) => {
-          const aTime = a.startTime ? timeToMin(a.startTime) : Infinity;
-          const bTime = b.startTime ? timeToMin(b.startTime) : Infinity;
-          return aTime - bTime;
-        });
+        columnTasks.sort((a, b) => (a.startTime ? timeToMin(a.startTime) : Infinity) - (b.startTime ? timeToMin(b.startTime) : Infinity));
       } else if (column === 'soon') {
-        columnTasks.sort((a, b) => {
-          const aDate = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
-          const bDate = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
-          return aDate - bDate;
-        });
+        columnTasks.sort((a, b) => (a.dueDate ? new Date(a.dueDate).getTime() : Infinity) - (b.dueDate ? new Date(b.dueDate).getTime() : Infinity));
       } else {
         columnTasks.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
       }
@@ -832,7 +798,7 @@
             <>
               <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-1">
                 {columnTasks.length === 0 && <div className="text-center py-5 text-xs opacity-40">No {isIdea ? 'ideas' : 'tasks'}</div>}
-                {columnTasks.map(task => <TaskCard key={task.id} task={task} onToggle={()=>onToggle(task.id, task.completed)} onDelete={()=>onDelete(task.id)} onUpdate={(updates)=>onUpdate(task.id, updates)} is24Hour={is24Hour} isIdea={isIdea} isSoon={isSoon} columnType={cardType} />)}
+                {columnTasks.map(task => <TaskCard key={task.id} task={task} onToggle={()=>onToggle(task.id, task.completed)} onDelete={()=>onDelete(task.id)} onUpdate={(updates)=>onUpdate(task.id, updates)} is24Hour={is24Hour} isIdea={isIdea} columnType={cardType} />)}
               </div>
               <AddTaskForm column={column === 'newIdeas' ? 'newIdeas' : column} onAdd={onAdd} isIdea={isIdea} isSoon={isSoon} />
             </>
@@ -905,10 +871,7 @@
       const [authLoading, setAuthLoading] = useState(true);
       const [is24Hour, setIs24Hour] = useState(false);
       const [autoResetToday, setAutoResetToday] = useState(() => localStorage.getItem("autoResetToday") !== "false");
-      const [focusBgEnabled, setFocusBgEnabled] = useState(() => {
-        const stored = localStorage.getItem("focusBgEnabled");
-        return stored === null ? true : stored === "true";
-      });
+      const [focusBgEnabled, setFocusBgEnabled] = useState(() => localStorage.getItem("focusBgEnabled") !== "false");
       const [settingsOpen, setSettingsOpen] = useState(false);
       const [collapsed, setCollapsed] = useState({ today: false, soon: false, newIdeas: false });
       const { isDark, toggle: toggleTheme } = useTheme();
@@ -916,11 +879,8 @@
       const [loadingQuote] = useState(() => timeFacts[Math.floor(Math.random() * timeFacts.length)]);
 
       useEffect(() => {
-        if (focusBgEnabled) {
-          initParticleCanvas();
-        } else {
-          destroyParticleCanvas();
-        }
+        if (focusBgEnabled) initParticleCanvas();
+        else destroyParticleCanvas();
         return () => destroyParticleCanvas();
       }, [focusBgEnabled]);
 
@@ -932,6 +892,7 @@
         const unsub = auth.onAuthStateChanged(u => { setUser(u); setAuthLoading(false); });
         return () => unsub();
       }, []);
+      
       useEffect(() => { localStorage.setItem("autoResetToday", autoResetToday); }, [autoResetToday]);
 
       const login = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
@@ -941,21 +902,13 @@
         return (
           <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #0f2027, #203a43, #2c5364)' }}>
             <canvas id="particle-canvas" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }}></canvas>
-            <div className="relative z-10 animate-pulse mb-6">
-              <img src="https://i.ibb.co/wZCzhSfW/2task-manager-favicon.png" className="w-16 h-16 rounded-full shadow-lg" />
-            </div>
+            <div className="relative z-10 animate-pulse mb-6"><img src="https://i.ibb.co/wZCzhSfW/2task-manager-favicon.png" className="w-16 h-16 rounded-full shadow-lg" /></div>
             <div className="relative z-10 loading-quote">{loadingQuote}</div>
-            <div className="relative z-10 mt-6 text-xs opacity-70">loading your workspace...</div>
           </div>
         );
       }
       if (!user) {
-        setTimeout(() => {
-          const canvas = document.getElementById('particle-canvas');
-          if (canvas && !particleAnimationId) {
-            initParticleCanvas();
-          }
-        }, 0);
+        setTimeout(() => { if (!particleAnimationId) initParticleCanvas(); }, 0);
         return (
           <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #0f2027, #203a43, #2c5364)' }}>
             <canvas id="particle-canvas" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }}></canvas>
@@ -976,23 +929,14 @@
         return (
           <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #0f2027, #203a43, #2c5364)' }}>
             <canvas id="particle-canvas" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 0, pointerEvents: 'none' }}></canvas>
-            <div className="relative z-10 animate-pulse mb-6">
-              <img src="https://i.ibb.co/wZCzhSfW/2task-manager-favicon.png" className="w-16 h-16 rounded-full shadow-lg" />
-            </div>
+            <div className="relative z-10 animate-pulse mb-6"><img src="https://i.ibb.co/wZCzhSfW/2task-manager-favicon.png" className="w-16 h-16 rounded-full shadow-lg" /></div>
             <div className="relative z-10 loading-quote">{loadingQuote}</div>
-            <div className="relative z-10 mt-6 text-xs opacity-70">loading your data...</div>
           </div>
         );
       }
 
       const todayTasks = tasks.filter(t => t.column === 'today');
       
-      const columns = [
-        { key: 'today', title: 'Must have done Today', isIdea: false, isSoon: false, showCounter: true },
-        { key: 'soon', title: 'I will do this soon', isIdea: false, isSoon: true, showCounter: true },
-        { key: 'newIdeas', title: 'New Ideas', isIdea: true, isSoon: false, showCounter: false }
-      ];
-
       return (
         <>
           <canvas id="particle-canvas"></canvas>
@@ -1003,10 +947,7 @@
                 <div className="flex items-center gap-4">
                   <span className="text-xs font-bold tracking-wider text-muted-foreground">TIME MANAGEMENT</span>
                   <button onClick={()=>setSettingsOpen(true)} className="p-2 rounded-md hover:bg-black/5 transition-colors">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                      <circle cx="12" cy="12" r="3"/>
-                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                    </svg>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                   </button>
                 </div>
               </div>
@@ -1014,24 +955,9 @@
               <div className="flex flex-col lg:flex-row gap-6">
                 <div className="flex-1">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                    {columns.map(col => (
-                      <Column
-                        key={col.key}
-                        column={col.key}
-                        title={col.title}
-                        tasks={tasks}
-                        onAdd={addTask}
-                        onUpdate={updateTask}
-                        onDelete={deleteTask}
-                        onToggle={toggleCompleted}
-                        showCounter={col.showCounter}
-                        is24Hour={is24Hour}
-                        isIdea={col.isIdea}
-                        isSoon={col.isSoon}
-                        collapsed={collapsed[col.key]}
-                        onToggleCollapse={() => setCollapsed(prev => ({ ...prev, [col.key]: !prev[col.key] }))}
-                      />
-                    ))}
+                    <Column column="today" title="Must have done Today" tasks={tasks} onAdd={addTask} onUpdate={updateTask} onDelete={deleteTask} onToggle={toggleCompleted} showCounter={true} is24Hour={is24Hour} isIdea={false} isSoon={false} collapsed={collapsed.today} onToggleCollapse={()=>setCollapsed(p=>({...p, today:!p.today}))} />
+                    <Column column="soon" title="I will do this soon" tasks={tasks} onAdd={addTask} onUpdate={updateTask} onDelete={deleteTask} onToggle={toggleCompleted} showCounter={true} is24Hour={is24Hour} isIdea={false} isSoon={true} collapsed={collapsed.soon} onToggleCollapse={()=>setCollapsed(p=>({...p, soon:!p.soon}))} />
+                    <Column column="newIdeas" title="New Ideas" tasks={tasks} onAdd={addTask} onUpdate={updateTask} onDelete={deleteTask} onToggle={toggleCompleted} showCounter={false} is24Hour={is24Hour} isIdea={true} isSoon={false} collapsed={collapsed.newIdeas} onToggleCollapse={()=>setCollapsed(p=>({...p, newIdeas:!p.newIdeas}))} />
                   </div>
                 </div>
                 
